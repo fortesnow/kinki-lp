@@ -31,25 +31,70 @@
 <body>
     <script>
     // CTAボタン（公式LINEでプレゼントをもらう）のみに登録完了イベントを発火
-    document.addEventListener('DOMContentLoaded', function() {
+    function setupCTATracking() {
         // すべてのCTAボタンを取得（.cta-buttonクラスのみ）
         const ctaButtons = document.querySelectorAll('.cta-button');
         
+        if (ctaButtons.length === 0) {
+            console.log('CTA buttons not found');
+            return;
+        }
+        
         ctaButtons.forEach(function(button) {
-            // 1回だけイベントリスナーを追加（重複防止）
             button.addEventListener('click', function(e) {
                 // Meta Pixelで登録完了イベントを発火（CTAボタンのみ）
-                if (typeof fbq !== 'undefined') {
-                    fbq('track', 'CompleteRegistration', {
-                        content_name: '公式LINE登録',
-                        content_category: 'CTA Button Click',
-                        value: 0,
-                        currency: 'JPY'
-                    });
+                if (typeof window.fbq !== 'undefined' && window.fbq) {
+                    try {
+                        window.fbq('track', 'CompleteRegistration', {
+                            content_name: '公式LINE登録',
+                            content_category: 'CTA Button Click',
+                            value: 0,
+                            currency: 'JPY'
+                        });
+                        console.log('CompleteRegistration event fired');
+                    } catch (error) {
+                        console.error('Error firing CompleteRegistration event:', error);
+                    }
+                } else {
+                    console.warn('fbq is not defined');
                 }
-            }, { once: false }); // 複数回クリック可能
+            });
         });
-    });
+        
+        console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons');
+    }
+    
+    // Meta Pixelが読み込まれるのを待つ
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // fbqが利用可能になるまで待機
+            var checkFbq = setInterval(function() {
+                if (typeof window.fbq !== 'undefined' && window.fbq) {
+                    clearInterval(checkFbq);
+                    setupCTATracking();
+                }
+            }, 100);
+            
+            // 5秒後にタイムアウト
+            setTimeout(function() {
+                clearInterval(checkFbq);
+                setupCTATracking(); // それでも設定を試みる
+            }, 5000);
+        });
+    } else {
+        // 既にDOMが読み込まれている場合
+        var checkFbq = setInterval(function() {
+            if (typeof window.fbq !== 'undefined' && window.fbq) {
+                clearInterval(checkFbq);
+                setupCTATracking();
+            }
+        }, 100);
+        
+        setTimeout(function() {
+            clearInterval(checkFbq);
+            setupCTATracking();
+        }, 5000);
+    }
     </script>
     <main class="main-container">
         <!-- ヘッダー画像 -->
