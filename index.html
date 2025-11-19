@@ -36,15 +36,43 @@
         const ctaButtons = document.querySelectorAll('.cta-button');
         
         ctaButtons.forEach(function(button) {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function(e) {
                 // Meta Pixelで登録完了イベントを発火
                 if (typeof fbq !== 'undefined') {
                     fbq('track', 'CompleteRegistration', {
                         content_name: '公式LINE登録',
-                        content_category: 'CTA Button Click'
+                        content_category: 'CTA Button Click',
+                        value: 0,
+                        currency: 'JPY'
                     });
+                    
+                    // イベントが確実に送信されるように少し待機
+                    setTimeout(function() {
+                        // リンクの遷移は通常通り実行される
+                    }, 100);
                 }
-            });
+            }, false);
+        });
+    });
+    
+    // Meta Pixelが読み込まれる前にクリックされた場合の対策
+    window.addEventListener('load', function() {
+        const ctaButtons = document.querySelectorAll('.cta-button');
+        ctaButtons.forEach(function(button) {
+            // 既存のイベントリスナーが設定されていない場合のフォールバック
+            const originalHref = button.getAttribute('href');
+            if (originalHref && originalHref.includes('line.me')) {
+                button.addEventListener('click', function(e) {
+                    if (typeof fbq !== 'undefined') {
+                        fbq('track', 'CompleteRegistration', {
+                            content_name: '公式LINE登録',
+                            content_category: 'CTA Button Click',
+                            value: 0,
+                            currency: 'JPY'
+                        });
+                    }
+                }, true); // キャプチャフェーズで実行
+            }
         });
     });
     </script>
