@@ -41,10 +41,11 @@ body {
     box-sizing: border-box;
 }
 
-/* 画像の縦横比を正確に保持 */
+/* 画像の縦横比を正確に保持 - 文字を含む画像はスムーズなレンダリングを使用 */
 img {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
+    image-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .image-placeholder {
