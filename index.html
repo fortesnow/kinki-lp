@@ -153,145 +153,49 @@
     </main>
     
     <script>
-    // CTAボタン（公式LINEでプレゼントをもらう）のみに登録完了イベントを発火
-    // ページの最後に配置して、すべての要素が読み込まれた後に実行
-    (function() {
-        var trackingSetup = false;
-        
-        function fireCompleteRegistration() {
-            if (typeof window.fbq !== 'undefined' && window.fbq) {
-                try {
-                    window.fbq('track', 'CompleteRegistration', {
-                        content_name: '公式LINE登録',
-                        content_category: 'CTA Button Click',
-                        value: 0,
-                        currency: 'JPY'
-                    });
-                    console.log('CompleteRegistration event fired successfully');
-                    return true;
-                } catch (error) {
-                    console.error('Error firing CompleteRegistration event:', error);
-                    return false;
+    (function () {
+        // fbqの読み込み順事故に強くする
+        function fireCompleteRegistration(eventId){
+            try {
+                if (window.fbq) {
+                    fbq('track', 'CompleteRegistration', {}, eventId ? {eventID: eventId} : undefined);
                 }
-            } else {
-                console.warn('fbq is not defined');
-                return false;
-            }
+            } catch(_) {}
         }
-        
-        function setupCTATracking() {
-            if (trackingSetup) {
-                return true;
-            }
-            
-            // すべてのCTAボタンを取得（.cta-buttonクラスのみ）
-            const ctaButtons = document.querySelectorAll('.cta-button');
-            
-            if (ctaButtons.length === 0) {
-                console.warn('CTA buttons not found');
-                return false;
-            }
-            
-            let setupCount = 0;
-            ctaButtons.forEach(function(button, index) {
-                // 既にイベントリスナーが設定されているかチェック
-                if (button.dataset.trackingSetup === 'true') {
-                    return;
-                }
-                
-                // クリックイベントを設定
-                button.addEventListener('click', function(e) {
-                    console.log('CTA button clicked: ' + (button.id || 'button-' + index));
-                    fireCompleteRegistration();
-                }, { capture: false, passive: true });
-                
-                button.dataset.trackingSetup = 'true';
-                setupCount++;
-            });
-            
-            if (setupCount > 0) {
-                trackingSetup = true;
-                console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons, setup ' + setupCount + ' listeners');
-            }
-            
-            return setupCount > 0;
+
+        // 同一クリックの多重発火を抑制（1秒以内）
+        let lastAt = 0;
+        function safeTrack(){
+            const now = Date.now();
+            if (now - lastAt < 1000) return;
+            lastAt = now;
+            // CAPI併用予定ならeventIDを作る
+            const eventId = 'cta-' + now;
+            fireCompleteRegistration(eventId);
         }
-        
-        // 初期化関数
-        function initTracking() {
-            // fbqが利用可能か確認
-            if (typeof window.fbq !== 'undefined' && window.fbq) {
-                console.log('fbq is available, setting up CTA tracking');
-                setupCTATracking();
-                return true;
-            } else {
-                console.log('fbq not yet available, waiting...');
-                return false;
-            }
-        }
-        
-        // ページが完全に読み込まれた後に実行
-        if (document.readyState === 'complete') {
-            // すぐに試行
-            if (!initTracking()) {
-                // fbqが利用可能になるまで待機
-                var checkFbq = setInterval(function() {
-                    if (initTracking()) {
-                        clearInterval(checkFbq);
-                    }
-                }, 50);
-                
-                // 5秒後にタイムアウト（それでも設定を試みる）
-                setTimeout(function() {
-                    clearInterval(checkFbq);
-                    setupCTATracking();
-                    console.log('CTA tracking initialized (timeout)');
-                }, 5000);
-            }
-        } else if (document.readyState === 'interactive') {
-            // DOMContentLoadedが既に発火している場合
-            setTimeout(function() {
-                if (!initTracking()) {
-                    var checkFbq = setInterval(function() {
-                        if (initTracking()) {
-                            clearInterval(checkFbq);
-                        }
-                    }, 50);
-                    
-                    setTimeout(function() {
-                        clearInterval(checkFbq);
-                        setupCTATracking();
-                    }, 5000);
-                }
-            }, 100);
-        } else {
-            // DOMContentLoadedを待つ
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(function() {
-                    if (!initTracking()) {
-                        var checkFbq = setInterval(function() {
-                            if (initTracking()) {
-                                clearInterval(checkFbq);
-                            }
-                        }, 50);
-                        
-                        setTimeout(function() {
-                            clearInterval(checkFbq);
-                            setupCTATracking();
-                        }, 5000);
-                    }
-                }, 100);
-            });
-        }
-        
-        // window.loadも待機（念のため）
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                if (!trackingSetup) {
-                    initTracking();
-                }
-            }, 500);
-        });
+
+        // イベント委任：要素差し替えに強い
+        document.addEventListener('click', function(e){
+            const el = e.target.closest('a, button, [role="button"]');
+            if (!el) return;
+
+            // どれかに当たれば「CTA」とみなす（必要なら条件を足す/削る）
+            const isCtaId    = el.id && /^cta-btn-\d+$/i.test(el.id);          // cta-btn-1,2,3...
+            const isCalendly = el.matches('a[href*="calendly"]');               // カレンダーリンク
+            const isCtaClass = [...(el.classList || [])].some(c => /cta|btn|primary/i.test(c));
+
+            if (!(isCtaId || isCalendly || isCtaClass)) return;
+
+            // クリックで即発火
+            safeTrack();
+
+            // 同一タブ遷移でリクエストが落ちるのを防ぐ（必要時のみ有効化）
+            // if (el.tagName === 'A' && el.target !== '_blank') {
+            //   e.preventDefault();
+            //   const href = el.href;
+            //   setTimeout(() => location.href = href, 180); // 150–200msが目安
+            // }
+        }, true); // captureで早取り
     })();
     </script>
 </body>
