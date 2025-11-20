@@ -29,73 +29,6 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <script>
-    // CTAボタン（公式LINEでプレゼントをもらう）のみに登録完了イベントを発火
-    function setupCTATracking() {
-        // すべてのCTAボタンを取得（.cta-buttonクラスのみ）
-        const ctaButtons = document.querySelectorAll('.cta-button');
-        
-        if (ctaButtons.length === 0) {
-            console.log('CTA buttons not found');
-            return;
-        }
-        
-        ctaButtons.forEach(function(button) {
-            button.addEventListener('click', function(e) {
-                // Meta Pixelで登録完了イベントを発火（CTAボタンのみ）
-                if (typeof window.fbq !== 'undefined' && window.fbq) {
-                    try {
-                        window.fbq('track', 'CompleteRegistration', {
-                            content_name: '公式LINE登録',
-                            content_category: 'CTA Button Click',
-                            value: 0,
-                            currency: 'JPY'
-                        });
-                        console.log('CompleteRegistration event fired');
-                    } catch (error) {
-                        console.error('Error firing CompleteRegistration event:', error);
-                    }
-                } else {
-                    console.warn('fbq is not defined');
-                }
-            });
-        });
-        
-        console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons');
-    }
-    
-    // Meta Pixelが読み込まれるのを待つ
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            // fbqが利用可能になるまで待機
-            var checkFbq = setInterval(function() {
-                if (typeof window.fbq !== 'undefined' && window.fbq) {
-                    clearInterval(checkFbq);
-                    setupCTATracking();
-                }
-            }, 100);
-            
-            // 5秒後にタイムアウト
-            setTimeout(function() {
-                clearInterval(checkFbq);
-                setupCTATracking(); // それでも設定を試みる
-            }, 5000);
-        });
-    } else {
-        // 既にDOMが読み込まれている場合
-        var checkFbq = setInterval(function() {
-            if (typeof window.fbq !== 'undefined' && window.fbq) {
-                clearInterval(checkFbq);
-                setupCTATracking();
-            }
-        }, 100);
-        
-        setTimeout(function() {
-            clearInterval(checkFbq);
-            setupCTATracking();
-        }, 5000);
-    }
-    </script>
     <main class="main-container">
         <!-- ヘッダー画像 -->
         <img src="images/image1.webp" alt="家づくり相談所" class="hero-image">
@@ -218,5 +151,91 @@
             <p>Copyright 2025 家づくり相談所</p>
         </footer>
     </main>
+    
+    <script>
+    // CTAボタン（公式LINEでプレゼントをもらう）のみに登録完了イベントを発火
+    // ページの最後に配置して、すべての要素が読み込まれた後に実行
+    (function() {
+        function setupCTATracking() {
+            // すべてのCTAボタンを取得（.cta-buttonクラスのみ）
+            const ctaButtons = document.querySelectorAll('.cta-button');
+            
+            if (ctaButtons.length === 0) {
+                console.warn('CTA buttons not found');
+                return false;
+            }
+            
+            let setupCount = 0;
+            ctaButtons.forEach(function(button) {
+                // 既にイベントリスナーが設定されているかチェック
+                if (button.dataset.trackingSetup === 'true') {
+                    return;
+                }
+                
+                button.addEventListener('click', function(e) {
+                    // Meta Pixelで登録完了イベントを発火（CTAボタンのみ）
+                    if (typeof window.fbq !== 'undefined' && window.fbq) {
+                        try {
+                            window.fbq('track', 'CompleteRegistration', {
+                                content_name: '公式LINE登録',
+                                content_category: 'CTA Button Click',
+                                value: 0,
+                                currency: 'JPY'
+                            });
+                            console.log('CompleteRegistration event fired');
+                        } catch (error) {
+                            console.error('Error firing CompleteRegistration event:', error);
+                        }
+                    } else {
+                        console.warn('fbq is not defined when button clicked');
+                    }
+                });
+                
+                button.dataset.trackingSetup = 'true';
+                setupCount++;
+            });
+            
+            console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons, setup ' + setupCount + ' listeners');
+            return setupCount > 0;
+        }
+        
+        // ページが完全に読み込まれた後に実行
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            // fbqが利用可能になるまで待機
+            var checkFbq = setInterval(function() {
+                if (typeof window.fbq !== 'undefined' && window.fbq) {
+                    clearInterval(checkFbq);
+                    if (setupCTATracking()) {
+                        console.log('CTA tracking initialized successfully');
+                    }
+                }
+            }, 50);
+            
+            // 3秒後にタイムアウト（それでも設定を試みる）
+            setTimeout(function() {
+                clearInterval(checkFbq);
+                if (setupCTATracking()) {
+                    console.log('CTA tracking initialized (timeout)');
+                } else {
+                    console.error('Failed to setup CTA tracking');
+                }
+            }, 3000);
+        } else {
+            window.addEventListener('load', function() {
+                var checkFbq = setInterval(function() {
+                    if (typeof window.fbq !== 'undefined' && window.fbq) {
+                        clearInterval(checkFbq);
+                        setupCTATracking();
+                    }
+                }, 50);
+                
+                setTimeout(function() {
+                    clearInterval(checkFbq);
+                    setupCTATracking();
+                }, 3000);
+            });
+        }
+    })();
+    </script>
 </body>
 </html>
