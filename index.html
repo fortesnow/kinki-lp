@@ -156,7 +156,34 @@
     // CTAボタン（公式LINEでプレゼントをもらう）のみに登録完了イベントを発火
     // ページの最後に配置して、すべての要素が読み込まれた後に実行
     (function() {
+        var trackingSetup = false;
+        
+        function fireCompleteRegistration() {
+            if (typeof window.fbq !== 'undefined' && window.fbq) {
+                try {
+                    window.fbq('track', 'CompleteRegistration', {
+                        content_name: '公式LINE登録',
+                        content_category: 'CTA Button Click',
+                        value: 0,
+                        currency: 'JPY'
+                    });
+                    console.log('CompleteRegistration event fired successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Error firing CompleteRegistration event:', error);
+                    return false;
+                }
+            } else {
+                console.warn('fbq is not defined');
+                return false;
+            }
+        }
+        
         function setupCTATracking() {
+            if (trackingSetup) {
+                return true;
+            }
+            
             // すべてのCTAボタンを取得（.cta-buttonクラスのみ）
             const ctaButtons = document.querySelectorAll('.cta-button');
             
@@ -166,75 +193,105 @@
             }
             
             let setupCount = 0;
-            ctaButtons.forEach(function(button) {
+            ctaButtons.forEach(function(button, index) {
                 // 既にイベントリスナーが設定されているかチェック
                 if (button.dataset.trackingSetup === 'true') {
                     return;
                 }
                 
+                // クリックイベントを設定
                 button.addEventListener('click', function(e) {
-                    // Meta Pixelで登録完了イベントを発火（CTAボタンのみ）
-                    if (typeof window.fbq !== 'undefined' && window.fbq) {
-                        try {
-                            window.fbq('track', 'CompleteRegistration', {
-                                content_name: '公式LINE登録',
-                                content_category: 'CTA Button Click',
-                                value: 0,
-                                currency: 'JPY'
-                            });
-                            console.log('CompleteRegistration event fired');
-                        } catch (error) {
-                            console.error('Error firing CompleteRegistration event:', error);
-                        }
-                    } else {
-                        console.warn('fbq is not defined when button clicked');
-                    }
-                });
+                    console.log('CTA button clicked: ' + (button.id || 'button-' + index));
+                    fireCompleteRegistration();
+                }, { capture: false, passive: true });
                 
                 button.dataset.trackingSetup = 'true';
                 setupCount++;
             });
             
-            console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons, setup ' + setupCount + ' listeners');
+            if (setupCount > 0) {
+                trackingSetup = true;
+                console.log('CTA tracking setup complete. Found ' + ctaButtons.length + ' buttons, setup ' + setupCount + ' listeners');
+            }
+            
             return setupCount > 0;
         }
         
+        // 初期化関数
+        function initTracking() {
+            // fbqが利用可能か確認
+            if (typeof window.fbq !== 'undefined' && window.fbq) {
+                console.log('fbq is available, setting up CTA tracking');
+                setupCTATracking();
+                return true;
+            } else {
+                console.log('fbq not yet available, waiting...');
+                return false;
+            }
+        }
+        
         // ページが完全に読み込まれた後に実行
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            // fbqが利用可能になるまで待機
-            var checkFbq = setInterval(function() {
-                if (typeof window.fbq !== 'undefined' && window.fbq) {
-                    clearInterval(checkFbq);
-                    if (setupCTATracking()) {
-                        console.log('CTA tracking initialized successfully');
-                    }
-                }
-            }, 50);
-            
-            // 3秒後にタイムアウト（それでも設定を試みる）
-            setTimeout(function() {
-                clearInterval(checkFbq);
-                if (setupCTATracking()) {
-                    console.log('CTA tracking initialized (timeout)');
-                } else {
-                    console.error('Failed to setup CTA tracking');
-                }
-            }, 3000);
-        } else {
-            window.addEventListener('load', function() {
+        if (document.readyState === 'complete') {
+            // すぐに試行
+            if (!initTracking()) {
+                // fbqが利用可能になるまで待機
                 var checkFbq = setInterval(function() {
-                    if (typeof window.fbq !== 'undefined' && window.fbq) {
+                    if (initTracking()) {
                         clearInterval(checkFbq);
-                        setupCTATracking();
                     }
                 }, 50);
                 
+                // 5秒後にタイムアウト（それでも設定を試みる）
                 setTimeout(function() {
                     clearInterval(checkFbq);
                     setupCTATracking();
-                }, 3000);
+                    console.log('CTA tracking initialized (timeout)');
+                }, 5000);
+            }
+        } else if (document.readyState === 'interactive') {
+            // DOMContentLoadedが既に発火している場合
+            setTimeout(function() {
+                if (!initTracking()) {
+                    var checkFbq = setInterval(function() {
+                        if (initTracking()) {
+                            clearInterval(checkFbq);
+                        }
+                    }, 50);
+                    
+                    setTimeout(function() {
+                        clearInterval(checkFbq);
+                        setupCTATracking();
+                    }, 5000);
+                }
+            }, 100);
+        } else {
+            // DOMContentLoadedを待つ
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    if (!initTracking()) {
+                        var checkFbq = setInterval(function() {
+                            if (initTracking()) {
+                                clearInterval(checkFbq);
+                            }
+                        }, 50);
+                        
+                        setTimeout(function() {
+                            clearInterval(checkFbq);
+                            setupCTATracking();
+                        }, 5000);
+                    }
+                }, 100);
             });
         }
+        
+        // window.loadも待機（念のため）
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (!trackingSetup) {
+                    initTracking();
+                }
+            }, 500);
+        });
     })();
     </script>
 </body>
